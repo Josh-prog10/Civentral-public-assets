@@ -1,0 +1,23 @@
+# Version control
+.git
+.gitignore
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Node dependencies
+node_modules/
+
+# Local database dumps and backups
+*.sql
+civentral_local.sql
+
+# Docker files
+Dockerfile*
+.dockerignore
+
+# Logs and cache
+*.log
+.cache
