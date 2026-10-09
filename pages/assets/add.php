@@ -76,7 +76,7 @@ include $basePath . 'includes/sidebar.php';
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
-    #map { height: 280px; border-radius: 0.5rem; border: 1px solid #cbd5e1; }
+    #map { height: 320px; border-radius: 0.5rem; border: 1px solid #cbd5e1; }
     .dark #map { border-color: #334155; }
 </style>
 
@@ -149,15 +149,15 @@ include $basePath . 'includes/sidebar.php';
                 <div id="field-coordinates">
                     <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Coordinates (optional)</label>
                     <div class="grid grid-cols-2 gap-3">
-                        <input type="number" step="any" name="latitude" id="latitude" class="px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-white text-sm focus:ring-2 focus:ring-brand-medium focus:outline-none" placeholder="Latitude">
-                        <input type="number" step="any" name="longitude" id="longitude" class="px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-white text-sm focus:ring-2 focus:ring-brand-medium focus:outline-none" placeholder="Longitude">
+                        <input type="number" step="any" name="latitude" id="latitude" class="px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-white text-sm focus:ring-2 focus:ring-brand-medium focus:outline-none" placeholder="Latitude" readonly>
+                        <input type="number" step="any" name="longitude" id="longitude" class="px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-white text-sm focus:ring-2 focus:ring-brand-medium focus:outline-none" placeholder="Longitude" readonly>
                     </div>
-                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Enter latitude/longitude manually, or use the map below. Only Caloocan City is allowed.</p>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Click on the map below to pin a location. Only Caloocan City is allowed.</p>
                 </div>
 
                 <!-- GIS Map (conditional - the map widget itself) -->
                 <div id="field-gis_map">
-                    <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">GIS Map</label>
+                    <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Pin Location on Map <span class="text-xs font-normal text-slate-500">(inside Caloocan City only)</span></label>
                     <div id="map"></div>
                     <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Click on the map to set coordinates. Only locations inside Caloocan City are allowed.</p>
                     <div id="map-warning" class="hidden mt-2 p-2 text-xs font-bold rounded-lg bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300 border border-rose-200 dark:border-rose-800"></div>
@@ -238,83 +238,141 @@ include $basePath . 'includes/sidebar.php';
         notes: true
     };
 
-    // Caloocan City bounding box (SW, NE)
-    var CALOOCAN_BOUNDS = L.latLngBounds(
-        [14.6100, 120.9550],   // South-West
-        [14.7850, 121.0650]    // North-East
-    );
-    var CALOOCAN_CENTER = [14.6760, 120.9800];
+    // ---------- Caloocan City Boundary (from cemeteries.php) ----------
+    var CALOOCAN_POLYGONS = [
+        // South Caloocan
+        [
+            [14.6140, 120.9550], [14.6130, 120.9720], [14.6180, 120.9950],
+            [14.6350, 121.0030], [14.6550, 121.0050], [14.6700, 121.0000],
+            [14.6880, 120.9870], [14.6900, 120.9700], [14.6800, 120.9550],
+            [14.6600, 120.9500], [14.6400, 120.9520]
+        ],
+        // North Caloocan
+        [
+            [14.7050, 120.9750], [14.6980, 121.0000], [14.7100, 121.0200],
+            [14.7300, 121.0350], [14.7500, 121.0600], [14.7700, 121.0750],
+            [14.7850, 121.0700], [14.7900, 121.0500], [14.7850, 121.0200],
+            [14.7750, 120.9900], [14.7600, 120.9700], [14.7400, 120.9650],
+            [14.7200, 120.9680]
+        ]
+    ];
+
+    function pointInPolygon(lat, lng, polygon) {
+        var inside = false;
+        for (var i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+            var xi = polygon[i][1], yi = polygon[i][0];
+            var xj = polygon[j][1], yj = polygon[j][0];
+            var intersect = ((yi > lat) !== (yj > lat)) &&
+                (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi);
+            if (intersect) inside = !inside;
+        }
+        return inside;
+    }
+
+    function isInCaloocan(lat, lng) {
+        for (var i = 0; i < CALOOCAN_POLYGONS.length; i++) {
+            if (pointInPolygon(lat, lng, CALOOCAN_POLYGONS[i])) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Monumento, Caloocan
+    var CALOOCAN_CENTER = [14.6572, 120.9837];
 
     document.addEventListener('DOMContentLoaded', function() {
-        // ---- Map setup (restricted to Caloocan City) ----
+        // ---- Map setup (same as cemeteries.php) ----
         var map = L.map('map', {
-            maxBounds: CALOOCAN_BOUNDS,
-            maxBoundsViscosity: 1.0,
+            maxBounds: [[14.55, 120.90], [14.85, 121.13]],
+            maxBoundsViscosity: 0.8,
             minZoom: 11
-        }).setView(CALOOCAN_CENTER, 12);
+        }).setView(CALOOCAN_CENTER, 13);
 
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap'
+            attribution: '© OpenStreetMap contributors'
         }).addTo(map);
 
-        // Draw the Caloocan boundary as a visual cue
-        L.rectangle(CALOOCAN_BOUNDS, {
-            color: '#0e7490',
-            weight: 1.5,
-            fill: false,
-            dashArray: '6 4'
-        }).addTo(map);
-
-        var marker = null;
-
-        function setMarker(lat, lng) {
-            if (marker) marker.setLatLng([lat, lng]);
-            else marker = L.marker([lat, lng]).addTo(map);
-            document.getElementById('latitude').value = lat;
-            document.getElementById('longitude').value = lng;
-        }
-
-        map.on('click', function(e) {
-            if (!CALOOCAN_BOUNDS.contains(e.latlng)) {
-                showMapWarning('You can only pin locations inside Caloocan City.');
-                return;
-            }
-            clearMapWarning();
-            setMarker(e.latlng.lat, e.latlng.lng);
+        // Draw Caloocan boundary polygons (teal border + subtle fill)
+        CALOOCAN_POLYGONS.forEach(function (poly) {
+            L.polygon(poly, {
+                color: '#0d6e8a',
+                weight: 2,
+                fillColor: '#0d6e8a',
+                fillOpacity: 0.08,
+                interactive: false
+            }).addTo(map);
         });
 
         var latInput = document.getElementById('latitude');
         var lngInput = document.getElementById('longitude');
-
-        function updateMapFromInputs() {
-            var lat = parseFloat(latInput.value);
-            var lng = parseFloat(lngInput.value);
-            if (isNaN(lat) || isNaN(lng)) return;
-
-            var latlng = L.latLng(lat, lng);
-            if (!CALOOCAN_BOUNDS.contains(latlng)) {
-                showMapWarning('Coordinates must be inside Caloocan City. Please enter a valid location.');
-                return;
-            }
-            clearMapWarning();
-            map.setView(latlng, 15);
-            setMarker(lat, lng);
-        }
-
-        latInput.addEventListener('change', updateMapFromInputs);
-        lngInput.addEventListener('change', updateMapFromInputs);
+        var lastValidLatLng = L.latLng(CALOOCAN_CENTER[0], CALOOCAN_CENTER[1]);
 
         // ---- Map warning helper ----
         function showMapWarning(msg) {
             var box = document.getElementById('map-warning');
             box.textContent = msg;
             box.classList.remove('hidden');
+            clearTimeout(showMapWarning._t);
+            showMapWarning._t = setTimeout(function () {
+                box.classList.add('hidden');
+            }, 3000);
         }
         function clearMapWarning() {
             var box = document.getElementById('map-warning');
             box.textContent = '';
             box.classList.add('hidden');
         }
+
+        // ---- Draggable preview marker ----
+        var previewMarker = null;
+
+        function setPreviewMarker(lat, lng) {
+            if (previewMarker) {
+                map.removeLayer(previewMarker);
+            }
+            previewMarker = L.marker([lat, lng], {
+                draggable: true,
+                icon: L.divIcon({
+                    className: '',
+                    html: '<div style="width:18px;height:18px;border-radius:50%;background:#0f766e;border:3px solid #fff;box-shadow:0 0 0 2px #0f766e;"></div>',
+                    iconSize: [18, 18],
+                    iconAnchor: [9, 9]
+                })
+            }).addTo(map);
+
+            // Snap back if dragged outside Caloocan
+            previewMarker.on('drag', function (e) {
+                var pos = e.target.getLatLng();
+                if (!isInCaloocan(pos.lat, pos.lng)) {
+                    e.target.setLatLng(lastValidLatLng);
+                }
+            });
+
+            previewMarker.on('dragend', function (e) {
+                var pos = e.target.getLatLng();
+                if (!isInCaloocan(pos.lat, pos.lng)) {
+                    showMapWarning('You can only pin a location inside Caloocan City.');
+                    return;
+                }
+                lastValidLatLng = pos;
+                latInput.value = pos.lat.toFixed(6);
+                lngInput.value = pos.lng.toFixed(6);
+            });
+        }
+
+        // Click-to-pin (restricted to Caloocan polygons)
+        map.on('click', function (e) {
+            if (!isInCaloocan(e.latlng.lat, e.latlng.lng)) {
+                showMapWarning('You can only pin a location inside Caloocan City.');
+                return;
+            }
+            clearMapWarning();
+            lastValidLatLng = e.latlng;
+            latInput.value = e.latlng.lat.toFixed(6);
+            lngInput.value = e.latlng.lng.toFixed(6);
+            setPreviewMarker(e.latlng.lat, e.latlng.lng);
+        });
 
         // ---- Field permission toggling ----
         function toggleField(key, show) {

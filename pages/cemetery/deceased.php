@@ -112,7 +112,7 @@ include $basePath . 'includes/sidebar.php';
             <div class="mb-4 p-3 bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 rounded-lg text-sm font-bold"><?= htmlspecialchars($error) ?></div>
         <?php endif; ?>
 
-        <!-- Add Form (unchanged) -->
+        <!-- Add Form (fixed layout) -->
         <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 shadow-sm mb-8">
             <h2 class="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-4">Add Deceased</h2>
             <form method="post" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -121,7 +121,9 @@ include $basePath . 'includes/sidebar.php';
                 <input type="text" name="last_name" placeholder="Last Name" required class="px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-white text-sm focus:ring-2 focus:ring-brand-medium focus:outline-none">
                 <input type="date" name="date_of_birth" min="1800-01-01" class="px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-white text-sm focus:ring-2 focus:ring-brand-medium focus:outline-none">
                 <input type="date" name="date_of_death" min="1800-01-01" required class="px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-white text-sm focus:ring-2 focus:ring-brand-medium focus:outline-none">
-                <div class="flex gap-2">
+                
+                <!-- FIXED: Notes and Add button now span 2 columns on larger screens -->
+                <div class="flex gap-2 sm:col-span-2 lg:col-span-2">
                     <input type="text" name="notes" placeholder="Notes" class="flex-1 px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-white text-sm focus:ring-2 focus:ring-brand-medium focus:outline-none">
                     <button type="submit" name="add" class="px-4 py-2 bg-brand-dark hover:bg-[#0e4f62] text-white font-bold text-sm rounded-lg transition shadow-sm whitespace-nowrap">
                         <i class="fa-solid fa-plus mr-1"></i> Add

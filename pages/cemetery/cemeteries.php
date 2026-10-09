@@ -15,25 +15,49 @@ if (!$isSuperAdmin && !$hasResourceAccess(['cemetery'])) {
 }
 
 /**
- * Caloocan City bounding box (approx.).
- * Covers both North and South Caloocan.
+ * Approximate boundary polygons for Caloocan City (South + North).
+ * Each polygon is an array of [lat, lng] pairs.
  */
-const CALOOCAN_BOUNDS = [
-    'minLat' => 14.6000,
-    'maxLat' => 14.8200,
-    'minLng' => 120.9400,
-    'maxLng' => 121.1200,
-];
-
-function isWithinCaloocan(?float $lat, ?float $lng): bool
+function caloocanPolygons(): array
 {
-    if ($lat === null || $lng === null) {
-        return false;
+    return [
+        // South Caloocan
+        [
+            [14.6140, 120.9550], [14.6130, 120.9720], [14.6180, 120.9950],
+            [14.6350, 121.0030], [14.6550, 121.0050], [14.6700, 121.0000],
+            [14.6880, 120.9870], [14.6900, 120.9700], [14.6800, 120.9550],
+            [14.6600, 120.9500], [14.6400, 120.9520],
+        ],
+        // North Caloocan
+        [
+            [14.7050, 120.9750], [14.6980, 121.0000], [14.7100, 121.0200],
+            [14.7300, 121.0350], [14.7500, 121.0600], [14.7700, 121.0750],
+            [14.7850, 121.0700], [14.7900, 121.0500], [14.7850, 121.0200],
+            [14.7750, 120.9900], [14.7600, 120.9700], [14.7400, 120.9650],
+            [14.7200, 120.9680],
+        ],
+    ];
+}
+
+function isWithinCaloocan(float $lat, float $lng): bool
+{
+    foreach (caloocanPolygons() as $poly) {
+        $inside = false;
+        $n = count($poly);
+        for ($i = 0, $j = $n - 1; $i < $n; $j = $i++) {
+            $xi = $poly[$i][1]; $yi = $poly[$i][0];
+            $xj = $poly[$j][1]; $yj = $poly[$j][0];
+            $intersect = (($yi > $lat) !== ($yj > $lat)) &&
+                ($lng < ($xj - $xi) * ($lat - $yi) / ($yj - $yi) + $xi);
+            if ($intersect) {
+                $inside = !$inside;
+            }
+        }
+        if ($inside) {
+            return true;
+        }
     }
-    return $lat >= CALOOCAN_BOUNDS['minLat']
-        && $lat <= CALOOCAN_BOUNDS['maxLat']
-        && $lng >= CALOOCAN_BOUNDS['minLng']
-        && $lng <= CALOOCAN_BOUNDS['maxLng'];
+    return false;
 }
 
 $message = $error = '';
@@ -244,40 +268,70 @@ include $basePath . 'includes/sidebar.php';
 </div>
 
 <script>
-    // ---------- Caloocan City bounds (must match PHP CALOOCAN_BOUNDS) ----------
-    const CALOOCAN_BOUNDS = {
-        minLat: <?= CALOOCAN_BOUNDS['minLat'] ?>,
-        maxLat: <?= CALOOCAN_BOUNDS['maxLat'] ?>,
-        minLng: <?= CALOOCAN_BOUNDS['minLng'] ?>,
-        maxLng: <?= CALOOCAN_BOUNDS['maxLng'] ?>
-    };
+    // ---------- Caloocan City Boundary Logic (from submit.php) ----------
+    var CALOOCAN_POLYGONS = [
+        // South Caloocan
+        [
+            [14.6140, 120.9550], [14.6130, 120.9720], [14.6180, 120.9950],
+            [14.6350, 121.0030], [14.6550, 121.0050], [14.6700, 121.0000],
+            [14.6880, 120.9870], [14.6900, 120.9700], [14.6800, 120.9550],
+            [14.6600, 120.9500], [14.6400, 120.9520]
+        ],
+        // North Caloocan
+        [
+            [14.7050, 120.9750], [14.6980, 121.0000], [14.7100, 121.0200],
+            [14.7300, 121.0350], [14.7500, 121.0600], [14.7700, 121.0750],
+            [14.7850, 121.0700], [14.7900, 121.0500], [14.7850, 121.0200],
+            [14.7750, 120.9900], [14.7600, 120.9700], [14.7400, 120.9650],
+            [14.7200, 120.9680]
+        ]
+    ];
 
-    const caloocanLatLngBounds = L.latLngBounds(
-        [CALOOCAN_BOUNDS.minLat, CALOOCAN_BOUNDS.minLng], // SW
-        [CALOOCAN_BOUNDS.maxLat, CALOOCAN_BOUNDS.maxLng]  // NE
-    );
+    function pointInPolygon(lat, lng, polygon) {
+        var inside = false;
+        for (var i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+            var xi = polygon[i][1], yi = polygon[i][0];
+            var xj = polygon[j][1], yj = polygon[j][0];
+            var intersect = ((yi > lat) !== (yj > lat)) &&
+                (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi);
+            if (intersect) inside = !inside;
+        }
+        return inside;
+    }
+
+    function isInCaloocan(lat, lng) {
+        for (var i = 0; i < CALOOCAN_POLYGONS.length; i++) {
+            if (pointInPolygon(lat, lng, CALOOCAN_POLYGONS[i])) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     // ---------- Leaflet Map ----------
-    const map = L.map('cemeteryMap', {
-        maxBounds: caloocanLatLngBounds,
-        maxBoundsViscosity: 1.0,   // hard lock – cannot pan outside Caloocan
-        minZoom: 12
-    });
+    // Start at Monumento, Caloocan
+    var initialLat = 14.6572, initialLng = 120.9837;
 
-    // Center on Caloocan City
-    map.fitBounds(caloocanLatLngBounds);
+    var map = L.map('cemeteryMap', {
+        maxBounds: [[14.55, 120.90], [14.85, 121.13]], // General bounds to prevent scrolling too far
+        maxBoundsViscosity: 0.8,
+        minZoom: 11
+    }).setView([initialLat, initialLng], 13);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors'
     }).addTo(map);
 
-    // Draw a subtle outline of the allowed area
-    L.rectangle(caloocanLatLngBounds, {
-        color: '#0f766e',
-        weight: 2,
-        fill: false,
-        dashArray: '6 6'
-    }).addTo(map).bindTooltip('Allowed area: Caloocan City', { sticky: true });
+    // Draw allowed area overlays (The solid border style from submit.php)
+    CALOOCAN_POLYGONS.forEach(function (poly) {
+        L.polygon(poly, {
+            color: '#0d6e8a',
+            weight: 2,
+            fillColor: '#0d6e8a',
+            fillOpacity: 0.08,
+            interactive: false
+        }).addTo(map);
+    });
 
     // ---------- Existing cemetery markers ----------
     const existingMarkers = {};
@@ -286,6 +340,8 @@ include $basePath . 'includes/sidebar.php';
             (function() {
                 const lat = <?= $cem['latitude'] ?>;
                 const lng = <?= $cem['longitude'] ?>;
+                // Note: We check if the existing marker is within bounds, but we still show it
+                // in case the boundaries have shifted slightly since it was saved.
                 const marker = L.marker([lat, lng]).addTo(map)
                     .bindPopup("<?= addslashes(htmlspecialchars($cem['name'])) ?>");
                 existingMarkers[<?= $cem['id'] ?>] = marker;
@@ -307,8 +363,29 @@ include $basePath . 'includes/sidebar.php';
     const clearPinBtn   = document.getElementById('clearPin');
     const formTitle     = document.getElementById('formTitle');
 
-    // ---------- Click-to-pin (restricted to Caloocan) ----------
+    // ---------- Click-to-pin (restricted to Caloocan Polygons) ----------
     let previewMarker = null;
+    let lastValidLatLng = L.latLng(initialLat, initialLng);
+
+    // Create a warning element dynamically if it doesn't exist
+    let warnEl = document.getElementById('mapWarning');
+    if (!warnEl) {
+        warnEl = document.createElement('p');
+        warnEl.id = 'mapWarning';
+        warnEl.className = 'hidden mt-2 text-xs font-bold text-rose-600 dark:text-rose-400';
+        // Insert it right after the map div
+        document.getElementById('cemeteryMap').parentNode.appendChild(warnEl);
+    }
+
+    function showWarning(msg) {
+        if (!warnEl) return;
+        warnEl.textContent = msg;
+        warnEl.classList.remove('hidden');
+        clearTimeout(showWarning._t);
+        showWarning._t = setTimeout(function () {
+            warnEl.classList.add('hidden');
+        }, 3000);
+    }
 
     function setPreviewMarker(lat, lng) {
         if (previewMarker) {
@@ -327,28 +404,30 @@ include $basePath . 'includes/sidebar.php';
         // If the user drags the marker outside Caloocan, snap it back.
         previewMarker.on('drag', function (e) {
             const pos = e.target.getLatLng();
-            if (!caloocanLatLngBounds.contains(pos)) {
+            if (!isInCaloocan(pos.lat, pos.lng)) {
                 // Revert to last valid position
-                const last = {
-                    lat: parseFloat(latInput.value) || CALOOCAN_BOUNDS.minLat,
-                    lng: parseFloat(lngInput.value) || CALOOCAN_BOUNDS.minLng
-                };
-                e.target.setLatLng([last.lat, last.lng]);
+                e.target.setLatLng(lastValidLatLng);
             }
         });
 
         previewMarker.on('dragend', function (e) {
             const pos = e.target.getLatLng();
+            if (!isInCaloocan(pos.lat, pos.lng)) {
+                showWarning('You can only pin a location inside Caloocan City.');
+                return;
+            }
+            lastValidLatLng = pos;
             latInput.value = pos.lat.toFixed(6);
             lngInput.value = pos.lng.toFixed(6);
         });
     }
 
     map.on('click', function (e) {
-        if (!caloocanLatLngBounds.contains(e.latlng)) {
-            // Safety net: Leaflet may sometimes still emit clicks at the edge
+        if (!isInCaloocan(e.latlng.lat, e.latlng.lng)) {
+            showWarning('You can only pin a location inside Caloocan City.');
             return;
         }
+        lastValidLatLng = e.latlng;
         latInput.value = e.latlng.lat.toFixed(6);
         lngInput.value = e.latlng.lng.toFixed(6);
         setPreviewMarker(e.latlng.lat, e.latlng.lng);
@@ -378,6 +457,7 @@ include $basePath . 'includes/sidebar.php';
             const lat = parseFloat(this.dataset.lat);
             const lng = parseFloat(this.dataset.lng);
             if (!isNaN(lat) && !isNaN(lng)) {
+                lastValidLatLng = L.latLng(lat, lng);
                 setPreviewMarker(lat, lng);
                 map.setView([lat, lng], Math.max(map.getZoom(), 15));
             }

@@ -129,7 +129,9 @@ include $basePath . 'includes/sidebar.php';
                     <option value="reserved">Reserved</option>
                     <option value="occupied">Occupied</option>
                 </select>
-                <div class="flex gap-2">
+                
+                <!-- FIXED: Notes and Add button now span 2 columns on large screens -->
+                <div class="flex gap-2 sm:col-span-2 lg:col-span-2">
                     <input type="text" name="notes" placeholder="Notes" class="flex-1 px-4 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-white text-sm focus:ring-2 focus:ring-brand-medium focus:outline-none">
                     <button type="submit" name="add" class="px-4 py-2 bg-brand-dark hover:bg-[#0e4f62] text-white font-bold text-sm rounded-lg transition shadow-sm whitespace-nowrap">
                         <i class="fa-solid fa-plus mr-1"></i> Add
